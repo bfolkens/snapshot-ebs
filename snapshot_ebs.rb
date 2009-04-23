@@ -23,7 +23,7 @@ def lock_lvm(options = {}, &block)
 	lvm_devs = `/sbin/dmsetup ls`.split("\n").map {|line| line.gsub /^(.+?)\t.*/, '\1' }
 	lvm_devs.each do |lvmdev|
 		$logger.info "Suspending LVM device #{lvmdev}"
-		$logger.debug `dmsetup -v suspend /dev/mapper/#{lvmdev}` unless options[:dry_run]
+		$logger.debug `/sbin/dmsetup -v suspend /dev/mapper/#{lvmdev}` unless options[:dry_run]
 	end
 
 	yield
@@ -31,7 +31,7 @@ ensure
 	# Make SURE these are resumed
 	lvm_devs.each do |lvmdev|
 		$logger.info "Resuming LVM device #{lvmdev}"
-		$logger.debug `dmsetup -v resume /dev/mapper/#{lvmdev}` unless options[:dry_run]
+		$logger.debug `/sbin/dmsetup -v resume /dev/mapper/#{lvmdev}` unless options[:dry_run]
 	end
 end
 
