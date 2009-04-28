@@ -36,13 +36,12 @@ ensure
 end
 
 def backup_type(time, now = Time.now)
-	hour_ago = 1.hour.ago(now)
 	yesterday = 1.day.ago(now)
 	last_week = 1.week.ago(now)
 	last_month = 1.month.ago(now)
 	last_year = 1.year.ago(now)
 
-	if time < hour_ago and time > yesterday
+	if time > yesterday
 		:hourly
 	elsif time < yesterday and time > last_week
 		:daily
@@ -144,7 +143,7 @@ ec2.describe_snapshots.sort {|a, b| b[:aws_started_at] <=> a[:aws_started_at] }.
 	$logger.info "Snapshot #{snap[:aws_id]} (#{level}): #{snap[:aws_started_at].inspect}, #{snap[:aws_status]} #{snap[:aws_progress]}"
 	$logger.debug "Totals: #{hourly} hourly, #{daily} daily, #{weekly} weekly, #{monthly} monthly"
 
-	if (hourly + daily + weekly + monthly) > MAX_TOTAL and eval(level.to_s).to_i > MAX[level]
+	if eval(level.to_s).to_i > MAX[level] #and (hourly + daily + weekly + monthly) > MAX_TOTAL
 		$logger.info "Removing expired EBS snapshot #{snap[:aws_id]}"
 		ec2.delete_snapshot(snap[:aws_id]) unless options[:dry_run]
 	end
