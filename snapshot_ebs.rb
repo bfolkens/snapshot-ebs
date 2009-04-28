@@ -35,6 +35,26 @@ ensure
 	end
 end
 
+def backup_type(time, now = Time.now)
+	hour_ago = 1.hour.ago(now)
+	yesterday = 1.day.ago(now)
+	last_week = 1.week.ago(now)
+	last_month = 1.month.ago(now)
+	last_year = 1.year.ago(now)
+
+	if time < hour_ago and time > yesterday
+		:hourly
+	elsif time < yesterday and time > last_week
+		:daily
+	elsif time < last_week and time > last_month
+		:weekly
+	elsif time < last_month and time > last_year
+		:monthly
+	else
+		nil
+	end
+end
+
 #
 # Main application
 #
@@ -101,7 +121,8 @@ lock_lvm options do
 end
 
 # Delete old snapshots
-MAX = { :hourly => 1, :daily => 6, :weekly => 3, :monthly => 6 }
+MAX = { :hourly => 3, :daily => 6, :weekly => 3, :monthly => 6 }
+MAX_TOTAL = MAX.values.inject(0) {|x, sum| sum + x}
 monthly = weekly = daily = hourly = 0
 # Iterate through the snapshots NEWEST FIRST!
 ec2.describe_snapshots.sort {|a, b| b[:aws_started_at] <=> a[:aws_started_at] }.each do |snap|
@@ -109,24 +130,21 @@ ec2.describe_snapshots.sort {|a, b| b[:aws_started_at] <=> a[:aws_started_at] }.
 	next unless volumes.map {|vol| vol[:aws_id] }.include?(snap[:aws_volume_id])
 
 	# Check dates and determine what "level" we're looking at
-	level = if snap[:aws_started_at] < snap[:aws_started_at].advance(:days => 1)
-		hourly += 1
-		:hourly
-	elsif snap[:aws_started_at] > snap[:aws_started_at].advance(:days => 1) and snap[:aws_started_at] < snap[:aws_started_at].advance(:weeks => 1)
-		daily += 1
-		:daily
-	elsif snap[:aws_started_at] > snap[:aws_started_at].advance(:weeks => 1) and snap[:aws_started_at] < snap[:aws_started_at].advance(:months => 1)
-		weekly += 1
-		:weekly
-	elsif snap[:aws_started_at] > snap[:aws_started_at].advance(:months => 1) and snap[:aws_started_at] < snap[:aws_started_at].advance(:years => 1)
-		monthly += 1
-		:monthly
+	case level = backup_type(snap[:aws_started_at])
+		when :hourly
+			hourly += 1
+		when :daily
+			daily += 1
+		when :weekly
+			weekly += 1
+		when :monthly
+			monthly += 1
 	end
 
 	$logger.info "Snapshot #{snap[:aws_id]} (#{level}): #{snap[:aws_started_at].inspect}, #{snap[:aws_status]} #{snap[:aws_progress]}"
 	$logger.debug "Totals: #{hourly} hourly, #{daily} daily, #{weekly} weekly, #{monthly} monthly"
 
-	if eval(level.to_s).to_i > MAX[level]
+	if (hourly + daily + weekly + monthly) > MAX_TOTAL and eval(level.to_s).to_i > MAX[level]
 		$logger.info "Removing expired EBS snapshot #{snap[:aws_id]}"
 		ec2.delete_snapshot(snap[:aws_id]) unless options[:dry_run]
 	end
