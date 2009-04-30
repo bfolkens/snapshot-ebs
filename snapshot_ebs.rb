@@ -39,7 +39,6 @@ def difference_in_time(from, to)
 	distance_in_minutes = (((to - from).abs)/60).round
 	distance_in_seconds = ((to - from).abs).round
 
-p distance_in_minutes
 	case distance_in_minutes
 		when 0..1439 # 0-23.9 hours
 			:hourly
