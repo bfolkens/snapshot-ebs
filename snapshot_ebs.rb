@@ -35,22 +35,22 @@ ensure
 	end
 end
 
-def backup_type(time, now = Time.now)
-	yesterday = 1.day.ago(now)
-	last_week = 1.week.ago(now)
-	last_month = 1.month.ago(now)
-	last_year = 1.year.ago(now)
+def difference_in_time(from, to)
+	distance_in_minutes = (((to - from).abs)/60).round
+	distance_in_seconds = ((to - from).abs).round
 
-	if time > yesterday
-		:hourly
-	elsif time < yesterday and time > last_week
-		:daily
-	elsif time < last_week and time > last_month
-		:weekly
-	elsif time < last_month and time > last_year
-		:monthly
-	else
-		nil
+p distance_in_minutes
+	case distance_in_minutes
+		when 0..1439 # 0-23.9 hours
+			:hourly
+		when 1440..10079 # 1-6.99 days
+			:daily
+		when 10080..43199 # 7-29.99 days
+			:weekly
+		when 43200..1051199 # 30-364.99 days
+			:monthly
+		else
+			nil
 	end
 end
 
@@ -123,13 +123,15 @@ end
 MAX = { :hourly => 3, :daily => 6, :weekly => 3, :monthly => 6 }
 MAX_TOTAL = MAX.values.inject(0) {|x, sum| sum + x}
 monthly = weekly = daily = hourly = 0
+last_level = first_time = nil
 # Iterate through the snapshots NEWEST FIRST!
 ec2.describe_snapshots.sort {|a, b| b[:aws_started_at] <=> a[:aws_started_at] }.each do |snap|
 	# Make sure we're dealing with this volume
 	next unless volumes.map {|vol| vol[:aws_id] }.include?(snap[:aws_volume_id])
 
 	# Check dates and determine what "level" we're looking at
-	case level = backup_type(snap[:aws_started_at])
+	first_time ||= snap[:aws_started_at]
+	case level = difference_in_time(first_time, snap[:aws_started_at])
 		when :hourly
 			hourly += 1
 		when :daily
@@ -139,6 +141,9 @@ ec2.describe_snapshots.sort {|a, b| b[:aws_started_at] <=> a[:aws_started_at] }.
 		when :monthly
 			monthly += 1
 	end
+
+	first_time = snap[:aws_started_at] if last_level != level
+	last_level = level
 
 	$logger.info "Snapshot #{snap[:aws_id]} (#{level}): #{snap[:aws_started_at].inspect}, #{snap[:aws_status]} #{snap[:aws_progress]}"
 	$logger.debug "Totals: #{hourly} hourly, #{daily} daily, #{weekly} weekly, #{monthly} monthly"
