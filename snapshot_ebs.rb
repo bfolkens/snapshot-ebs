@@ -2,56 +2,9 @@
 
 require 'logger'
 require 'optparse'
-require 'rubygems'
-require 'right_aws'
-require 'net/http'
-require 'lvm'
-require 'active_support'
+require 'pathname'
+require File.dirname(Pathname.new(__FILE__).realpath) + '/lib/snapshot_ebs'
 
-
-# hack to eliminate the SSL certificate verification notification
-class Net::HTTP
-	alias_method :old_initialize, :initialize
-	def initialize(*args)
-		old_initialize(*args)
-		@ssl_context = OpenSSL::SSL::SSLContext.new
-		@ssl_context.verify_mode = OpenSSL::SSL::VERIFY_NONE
-	end
-end
-
-def lock_lvm(options = {}, &block)
-	lvm_devs = `/sbin/dmsetup ls`.split("\n").map {|line| line.gsub /^(.+?)\t.*/, '\1' }
-	lvm_devs.each do |lvmdev|
-		$logger.info "Suspending LVM device #{lvmdev}"
-		$logger.debug `/sbin/dmsetup -v suspend /dev/mapper/#{lvmdev}` unless options[:dry_run]
-	end
-
-	yield
-ensure
-	# Make SURE these are resumed
-	lvm_devs.each do |lvmdev|
-		$logger.info "Resuming LVM device #{lvmdev}"
-		$logger.debug `/sbin/dmsetup -v resume /dev/mapper/#{lvmdev}` unless options[:dry_run]
-	end
-end
-
-def difference_in_time(from, to)
-	distance_in_minutes = (((to - from).abs)/60).round
-	distance_in_seconds = ((to - from).abs).round
-
-	case distance_in_minutes
-		when 0..1439 # 0-23.9 hours
-			:hourly
-		when 1440..10079 # 1-6.99 days
-			:daily
-		when 10080..43199 # 7-29.99 days
-			:weekly
-		when 43200..1051199 # 30-364.99 days
-			:monthly
-		else
-			nil
-	end
-end
 
 #
 # Main application
@@ -62,7 +15,7 @@ $logger.level = Logger::DEBUG
 
 options = {}
 parser = OptionParser.new do |p|
-	p.banner = 'Usage: snapshot_ebs.rb [options]'
+	p.banner = 'Usage: snapshot_ebs.rb [options] type max'
 	p.separator ''
 	p.separator 'Specific options:'
 
@@ -119,37 +72,22 @@ lock_lvm options do
 end
 
 # Delete old snapshots
-MAX = { :hourly => 4, :daily => 7, :weekly => 4, :monthly => 6 }
-MAX_TOTAL = MAX.values.inject(0) {|x, sum| sum + x}
-monthly = weekly = daily = hourly = 0
-last_level = first_time = nil
-# Iterate through the snapshots NEWEST FIRST!
-ec2.describe_snapshots.sort {|a, b| b[:aws_started_at] <=> a[:aws_started_at] }.each do |snap|
-	# Make sure we're dealing with this volume
-	next unless volumes.map {|vol| vol[:aws_id] }.include?(snap[:aws_volume_id])
+snapshots = sort_snapshots(ec2.describe_snapshots, volumes)
+$logger.debug "Totals: #{snapshots[:hourly].size} hourly, #{snapshots[:daily].size} daily, #{snapshots[:weekly].size} weekly, #{snapshots[:monthly].size} monthly"
 
-	# Check dates and determine what "level" we're looking at
-	first_time ||= snap[:aws_started_at]
-	case level = difference_in_time(first_time, snap[:aws_started_at])
-		when :hourly
-			hourly += 1
-		when :daily
-			daily += 1
-		when :weekly
-			weekly += 1
-		when :monthly
-			monthly += 1
-	end
+MAX = { :hourly => 3, :daily => 7, :weekly => 4, :monthly => 6 }
+snapshots.each_pair do |level, snaps|
+	snap_count = snaps.size
+	snaps.each_with_index do |snap, index|
+		$logger.info "Snapshot #{snap[:aws_id]}: #{snap[:aws_started_at].inspect} (#{level}), #{snap[:aws_status]} #{snap[:aws_progress]}"
 
-	first_time = snap[:aws_started_at] if last_level != level
-	last_level = level
-
-	$logger.info "Snapshot #{snap[:aws_id]} (#{level}): #{snap[:aws_started_at].inspect}, #{snap[:aws_status]} #{snap[:aws_progress]}"
-	$logger.debug "Totals: #{hourly} hourly, #{daily} daily, #{weekly} weekly, #{monthly} monthly"
-
-	if eval(level.to_s).to_i > MAX[level] #and (hourly + daily + weekly + monthly) > MAX_TOTAL
-		$logger.info "Removing expired EBS snapshot #{snap[:aws_id]}"
-		ec2.delete_snapshot(snap[:aws_id]) unless options[:dry_run]
+		# Delete if we've exceeded our level max
+		# OR if there are consecutive snapshots that are not the same as the current level (two daily snapshots a few hours apart)
+		next_snap = snaps[index + 1]
+		if index + 1 > MAX[level] or (next_snap and difference_in_time(snap[:aws_started_at], next_snap[:aws_started_at]) != level)
+			$logger.info "Removing expired EBS snapshot #{snap[:aws_id]}"
+			ec2.delete_snapshot(snap[:aws_id]) unless options[:dry_run]
+		end
 	end
 end
 
