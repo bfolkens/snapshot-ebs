@@ -119,7 +119,7 @@ lock_lvm options do
 end
 
 # Delete old snapshots
-MAX = { :hourly => 3, :daily => 6, :weekly => 3, :monthly => 6 }
+MAX = { :hourly => 4, :daily => 7, :weekly => 4, :monthly => 6 }
 MAX_TOTAL = MAX.values.inject(0) {|x, sum| sum + x}
 monthly = weekly = daily = hourly = 0
 last_level = first_time = nil
