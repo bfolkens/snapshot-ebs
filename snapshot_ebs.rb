@@ -75,7 +75,7 @@ end
 snapshots = sort_snapshots(ec2.describe_snapshots, volumes)
 $logger.debug "Totals: #{snapshots[:hourly].size} hourly, #{snapshots[:daily].size} daily, #{snapshots[:weekly].size} weekly, #{snapshots[:monthly].size} monthly"
 
-MAX = { :hourly => 3, :daily => 7, :weekly => 4, :monthly => 6 }
+MAX = { :hourly => 3, :daily => 7, :weekly => 5, :monthly => 6 }
 snapshots.each_pair do |level, snaps|
 	snap_count = snaps.size
 	snaps.each_with_index do |snap, index|
