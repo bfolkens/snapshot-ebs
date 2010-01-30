@@ -2,6 +2,7 @@
 
 require 'logger'
 require 'optparse'
+require 'socket'
 require 'pathname'
 require File.dirname(Pathname.new(__FILE__).realpath) + '/lib/snapshot_ebs'
 
@@ -63,9 +64,9 @@ end
 lock_lvm options do
 	# Snapshot all EBS vols included by lvm volumes
 	volumes.each do |vol|
-		$logger.info "Calling create-snapshot for #{vol[:aws_id]}"
+		$logger.info "Calling create-snapshot for #{vol[:aws_id]} as '#{Socket.gethostname}:#{vol[:aws_device]}'"
 		unless options[:dry_run]
-			result = ec2.create_snapshot(vol[:aws_id])
+			result = ec2.create_snapshot(vol[:aws_id], "#{Socket.gethostname}:#{vol[:aws_device]}")
 			$logger.info "Created snapshot #{result[:aws_id]} for #{result[:aws_volume_id]}"
 		end
 	end
