@@ -73,21 +73,23 @@ lock_lvm options do
 end
 
 # Delete old snapshots
-snapshots = sort_snapshots(ec2.describe_snapshots, volumes)
-$logger.debug "Totals: #{snapshots[:hourly].size} hourly, #{snapshots[:daily].size} daily, #{snapshots[:weekly].size} weekly, #{snapshots[:monthly].size} monthly"
-
 MAX = { :hourly => 3, :daily => 7, :weekly => 5, :monthly => 6 }
-snapshots.each_pair do |level, snaps|
-	snap_count = snaps.size
-	snaps.each_with_index do |snap, index|
-		$logger.info "Snapshot #{snap[:aws_id]}: #{snap[:aws_started_at].inspect} (#{level}), #{snap[:aws_status]} #{snap[:aws_progress]}"
+volumes.each do |vol|
+	snapshots = sort_snapshots(ec2.describe_snapshots, vol)
+	$logger.debug "Totals (#{vol[:aws_id]} #{vol[:aws_device]}): #{snapshots[:hourly].size} hourly, #{snapshots[:daily].size} daily, #{snapshots[:weekly].size} weekly, #{snapshots[:monthly].size} monthly"
 
-		# Delete if we've exceeded our level max
-		# OR if there are consecutive snapshots that are not the same as the current level (two daily snapshots a few hours apart)
-		next_snap = snaps[index + 1]
-		if index + 1 > MAX[level] or (next_snap and difference_in_time(snap[:aws_started_at], next_snap[:aws_started_at]) != level)
-			$logger.info "Removing expired EBS snapshot #{snap[:aws_id]}"
-			ec2.delete_snapshot(snap[:aws_id]) unless options[:dry_run]
+	snapshots.each_pair do |level, snaps|
+		snap_count = snaps.size
+		snaps.each_with_index do |snap, index|
+			$logger.info "Snapshot #{snap[:aws_id]}: #{snap[:aws_started_at].inspect} (#{level}), #{snap[:aws_status]} #{snap[:aws_progress]}"
+
+			# Delete if we've exceeded our level max
+			# OR if there are consecutive snapshots that are not the same as the current level (two daily snapshots a few hours apart)
+			next_snap = snaps[index + 1]
+			if index + 1 > MAX[level] or (next_snap and difference_in_time(snap[:aws_started_at], next_snap[:aws_started_at]) != level)
+				$logger.info "Removing expired EBS snapshot #{snap[:aws_id]}"
+				ec2.delete_snapshot(snap[:aws_id]) unless options[:dry_run]
+			end
 		end
 	end
 end

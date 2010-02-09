@@ -42,13 +42,13 @@ def difference_in_time(from, to)
 	end
 end
 
-def sort_snapshots(ec2_snapshots, ec2_volumes, now = Time.now)
+def sort_snapshots(ec2_snapshots, ec2_volume, now = Time.now)
 	snapshots = { :hourly => [], :daily => [], :weekly => [], :monthly => [] }
 
 	# Iterate through the snapshots NEWEST FIRST!
 	ec2_snapshots.sort {|a, b| b[:aws_started_at] <=> a[:aws_started_at] }.each do |snap|
 		# Make sure we're dealing with this volume
-		next unless ec2_volumes.map {|vol| vol[:aws_id] }.include?(snap[:aws_volume_id])
+		next unless ec2_volume[:aws_id] == snap[:aws_volume_id]
 
 		# Check dates and determine what "level" we're looking at
 		level = difference_in_time(snap[:aws_started_at], now)
