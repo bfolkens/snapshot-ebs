@@ -66,8 +66,12 @@ lock_lvm options do
 	volumes.each do |vol|
 		$logger.info "Calling create-snapshot for #{vol[:aws_id]} as '#{Socket.gethostname}:#{vol[:aws_device]}'"
 		unless options[:dry_run]
-			result = ec2.create_snapshot(vol[:aws_id], "#{Socket.gethostname}:#{vol[:aws_device]}")
-			$logger.info "Created snapshot #{result[:aws_id]} for #{result[:aws_volume_id]}"
+			begin
+				result = ec2.create_snapshot(vol[:aws_id], "#{Socket.gethostname}:#{vol[:aws_device]}")
+				$logger.info "Created snapshot #{result[:aws_id]} for #{result[:aws_volume_id]}"
+			rescue => e
+				puts e.message
+			end
 		end
 	end
 end
@@ -87,8 +91,12 @@ volumes.each do |vol|
 			# OR if there are consecutive snapshots that are not the same as the current level (two daily snapshots a few hours apart)
 			next_snap = snaps[index + 1]
 			if index + 1 > MAX[level] or (next_snap and difference_in_time(snap[:aws_started_at], next_snap[:aws_started_at]) != level)
-				$logger.info "Removing expired EBS snapshot #{snap[:aws_id]}"
-				ec2.delete_snapshot(snap[:aws_id]) unless options[:dry_run]
+				begin
+					$logger.info "Removing expired EBS snapshot #{snap[:aws_id]}"
+					ec2.delete_snapshot(snap[:aws_id]) unless options[:dry_run]
+				rescue => e
+					puts e.message
+				end
 			end
 		end
 	end
