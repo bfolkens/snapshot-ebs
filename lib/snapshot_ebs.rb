@@ -1,5 +1,4 @@
 require 'logger'
-require 'rubygems'
 require 'right_aws'
 require 'net/http'
 require 'lvm'

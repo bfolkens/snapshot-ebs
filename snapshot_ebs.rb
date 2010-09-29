@@ -1,5 +1,8 @@
 #!/usr/bin/env ruby
 
+require "rubygems"
+require "bundler/setup"
+
 require 'logger'
 require 'optparse'
 require 'socket'
