@@ -38,7 +38,7 @@ end
 CONFIG_FILE = "#{ENV['HOME']}/.snapshot_ebs_rc"
 if File.exists?(CONFIG_FILE)
 	yaml_config = YAML::load(File.open(CONFIG_FILE))
-	options = yaml_config.merge(options)
+	options.reverse_merge! yaml_config
 end
 
 # Check required options
