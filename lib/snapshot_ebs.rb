@@ -1,6 +1,4 @@
 require 'rubygems'
-require 'bundler/setup'
-
 require 'logger'
 gem 'right_aws', '1.11.0'
 require 'right_aws'
