@@ -2,12 +2,12 @@ require 'rubygems'
 require 'bundler/setup'
 
 require 'logger'
-require 'right_aws'
 gem 'right_aws', '1.11.0'
+require 'right_aws'
 require 'net/http'
 require 'lvm'
-require 'activesupport'
 gem 'activesupport', '2.3.8'
+require 'activesupport'
 
 require File.dirname(__FILE__) + '/silence_net_http'
 
