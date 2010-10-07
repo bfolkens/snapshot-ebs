@@ -17,7 +17,7 @@ $logger.level = Logger::DEBUG
 
 options = {}
 parser = OptionParser.new do |p|
-	p.banner = 'Usage: snapshot_ebs.rb [options] type max'
+	p.banner = 'Usage: snapshot_ebs.rb [options]'
 	p.separator ''
 	p.separator 'Specific options:'
 
