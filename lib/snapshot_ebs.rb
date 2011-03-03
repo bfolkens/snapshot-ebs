@@ -5,7 +5,7 @@ require 'right_aws'
 require 'net/http'
 require 'lvm'
 gem 'activesupport', '2.3.8'
-require 'activesupport'
+require 'active_support'
 
 require File.dirname(__FILE__) + '/silence_net_http'
 
