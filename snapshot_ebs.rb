@@ -91,7 +91,7 @@ volumes.each do |vol|
 			# Delete if we've exceeded our level max
 			# OR if there are consecutive snapshots that are not the same as the current level (two daily snapshots a few hours apart)
 			next_snap = snaps[index + 1]
-			if index + 1 > MAX[level] or (next_snap and difference_in_time(snap[:aws_started_at], next_snap[:aws_started_at]) != level)
+			if index + 1 > MAX[level] or (next_snap and difference_in_time(Time.parse(snap[:aws_started_at]), Time.parse(next_snap[:aws_started_at])) != level)
 				unless snap[:aws_status] == 'completed' and snap[:aws_progress] == '100%'
 					$logger.info "Skipping cleanup of #{snap[:aws_id]}, still in progress"
 					next

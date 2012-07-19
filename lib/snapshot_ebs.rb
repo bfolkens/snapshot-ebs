@@ -1,9 +1,8 @@
 require 'rubygems'
 require 'logger'
-gem 'right_aws', '1.11.0'
+gem 'right_aws', '~>3.0.4'
 require 'right_aws'
 require 'net/http'
-require 'lvm'
 gem 'activesupport', '2.3.8'
 require 'active_support'
 
@@ -48,12 +47,12 @@ def sort_snapshots(ec2_snapshots, ec2_volume, now = Time.now)
 	snapshots = { :hourly => [], :daily => [], :weekly => [], :monthly => [] }
 
 	# Iterate through the snapshots NEWEST FIRST!
-	ec2_snapshots.sort {|a, b| b[:aws_started_at] <=> a[:aws_started_at] }.each do |snap|
+	ec2_snapshots.sort {|a, b| Time.parse(b[:aws_started_at]) <=> Time.parse(a[:aws_started_at]) }.each do |snap|
 		# Make sure we're dealing with this volume
 		next unless ec2_volume[:aws_id] == snap[:aws_volume_id]
 
 		# Check dates and determine what "level" we're looking at
-		level = difference_in_time(snap[:aws_started_at], now)
+		level = difference_in_time(Time.parse(snap[:aws_started_at]), now)
 		snapshots[level] << snap
 	end
 
