@@ -1,4 +1,3 @@
 source 'http://rubygems.org'
-gem 'right_aws', '1.11.0'
+gem 'right_aws'
 gem 'ruby-lvm'
-gem 'activesupport', '2.3.8'

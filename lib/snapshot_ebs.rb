@@ -3,8 +3,6 @@ require 'logger'
 gem 'right_aws', '~>3.0.4'
 require 'right_aws'
 require 'net/http'
-gem 'activesupport', '2.3.8'
-require 'active_support'
 
 require File.dirname(__FILE__) + '/silence_net_http'
 
@@ -46,13 +44,17 @@ end
 def sort_snapshots(ec2_snapshots, ec2_volume, now = Time.now)
 	snapshots = { :hourly => [], :daily => [], :weekly => [], :monthly => [] }
 
-	# Iterate through the snapshots NEWEST FIRST!
-	ec2_snapshots.sort {|a, b| Time.parse(b[:aws_started_at]) <=> Time.parse(a[:aws_started_at]) }.each do |snap|
-		# Make sure we're dealing with this volume
-		next unless ec2_volume[:aws_id] == snap[:aws_volume_id]
+	# Reject those that don't match this volume
+	this_volume_snaps = ec2_snapshots.reject {|snap| ec2_volume[:aws_id] != snap[:aws_volume_id] }
 
-		# Check dates and determine what "level" we're looking at
-		level = difference_in_time(Time.parse(snap[:aws_started_at]), now)
+	# Sort the snapshots newest first
+	this_volume_snaps.sort! {|a, b| Time.parse(b[:aws_started_at]) <=> Time.parse(a[:aws_started_at]) }
+
+	# Check dates and form "levels"
+	last_timestamp = now
+	this_volume_snaps.each do |snap|
+		level = difference_in_time(Time.parse(snap[:aws_started_at]), last_timestamp)
+		last_timestamp = Time.parse(snap[:aws_started_at])
 		snapshots[level] << snap
 	end
 
