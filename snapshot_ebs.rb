@@ -79,9 +79,20 @@ lock_lvm options do
 end
 
 # Delete old snapshots
+LEVELS = [ :hourly, :daily, :weekly, :monthly ]
 MAX = { :hourly => 3, :daily => 7, :weekly => 5, :monthly => 6 }
 volumes.each do |vol|
 	snapshots = sort_snapshots(ec2.describe_snapshots, vol)
+
+	# Simulate a new entry
+	if options[:dry_run]
+		snapshots[:hourly] << { :aws_started_at => Time.now.strftime('%FT%T.000Z'),
+														:aws_status => 'pending',
+														:aws_progress => '0%',
+														:aws_id => 'snap-00000000',
+														:aws_volume_id => vol[:aws_id] }
+	end
+
 	$logger.debug "Totals (#{vol[:aws_id]} #{vol[:aws_device]}): #{snapshots[:hourly].size} hourly, #{snapshots[:daily].size} daily, #{snapshots[:weekly].size} weekly, #{snapshots[:monthly].size} monthly"
 
 	snapshots.each_pair do |level, snaps|
@@ -89,8 +100,17 @@ volumes.each do |vol|
 		snaps.each_with_index do |snap, index|
 			$logger.info "Snapshot #{snap[:aws_id]}: #{snap[:aws_started_at].inspect} (#{level}), #{snap[:aws_status]} #{snap[:aws_progress]}"
 
-			# Delete if we've exceeded our level max
+			# Check if we've exceeded our level max
 			if index + 1 > MAX[level]
+				next_snap = snaps[index + 1]
+				if next_snap
+					difference_to_next_snap = difference_in_time(Time.parse(snap[:aws_started_at]), Time.parse(next_snap[:aws_started_at]))
+					if difference_to_next_snap != level
+						$logger.info "Level #{level.to_s} differs from next level #{difference_to_next_snap}, retain"
+						next
+					end
+				end
+
 				unless snap[:aws_status] == 'completed' and snap[:aws_progress] == '100%'
 					$logger.info "Skipping cleanup of #{snap[:aws_id]}, still in progress"
 					next
