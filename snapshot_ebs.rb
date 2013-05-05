@@ -108,15 +108,23 @@ volumes.each do |vol|
 					next
 				end
 
+				# Check to see if there's another > snapshot
 				next_snap = snaps[index + 1]
+				next_level = LEVELS[LEVELS.rindex(level) + 1]
+				if next_snap.nil? and next_level_snaps = snapshots[next_level]
+					next_snap = next_level_snaps.first
+				end
+
+				# If so, check to see if we need retention on this snap
 				if next_snap
 					difference_to_next_snap = difference_in_time(Time.parse(snap[:aws_started_at]), Time.parse(next_snap[:aws_started_at]))
 					if difference_to_next_snap != level
-						$logger.info "Level #{level.to_s} differs from next level #{difference_to_next_snap}, retain"
+						$logger.info "Level #{level.to_s} differs from #{difference_to_next_snap} interval at next level, retain"
 						next
 					end
 				end
 
+				# Otherwise remove this one
 				begin
 					$logger.info "Removing expired EBS snapshot #{snap[:aws_id]}"
 					ec2.delete_snapshot(snap[:aws_id]) unless options[:dry_run]
